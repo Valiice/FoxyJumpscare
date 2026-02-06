@@ -16,9 +16,9 @@ permissions:
 
 jobs:
   Build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
-      DALAMUD_HOME: /tmp/dalamud
+      DALAMUD_HOME: ${{ github.workspace }}\dalamud
       DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
     steps:
       - name: Checkout Repository
@@ -38,28 +38,32 @@ jobs:
 
       - name: Download Dalamud Latest
         if: steps.cache-dalamud.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          wget ${{ env.DALAMUD_ARCHIVE_URL }} -O ${{ env.DALAMUD_HOME }}.zip
-          unzip ${{ env.DALAMUD_HOME }}.zip -d ${{ env.DALAMUD_HOME }}
+          Invoke-WebRequest -Uri "${{ env.DALAMUD_ARCHIVE_URL }}" -OutFile "${{ env.DALAMUD_HOME }}.zip"
+          Expand-Archive -Path "${{ env.DALAMUD_HOME }}.zip" -DestinationPath "${{ env.DALAMUD_HOME }}"
 
       - name: Determine Version
         id: get_version
+        shell: pwsh
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             # Manual run: use the input version
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-            echo "TAG_NAME=v${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          else
+            "VERSION=${{ github.event.inputs.version }}" >> $env:GITHUB_ENV
+            "TAG_NAME=v${{ github.event.inputs.version }}" >> $env:GITHUB_ENV
+          } else {
             # Tag push: strip the 'v' prefix
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-            echo "TAG_NAME=${GITHUB_REF_NAME}" >> $GITHUB_ENV
-          fi
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+            "VERSION=$version" >> $env:GITHUB_ENV
+            "TAG_NAME=${{ github.ref_name }}" >> $env:GITHUB_ENV
+          }
 
       - name: Build Project
         run: dotnet build --configuration Release FoxyJumpscare/FoxyJumpscare.csproj -p:AssemblyVersion=${{ env.VERSION }}
 
       - name: Rename Release Asset
-        run: mv FoxyJumpscare/bin/Release/FoxyJumpscare/latest.zip FoxyJumpscare/bin/Release/FoxyJumpscare/FoxyJumpscare.zip
+        shell: pwsh
+        run: Move-Item -Path "FoxyJumpscare\bin\Release\FoxyJumpscare\latest.zip" -Destination "FoxyJumpscare\bin\Release\FoxyJumpscare\FoxyJumpscare.zip"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
