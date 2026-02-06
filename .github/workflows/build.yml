@@ -8,7 +8,7 @@ on:
 
 jobs:
   Build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
       DALAMUD_HOME: /tmp/dalamud
       DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
@@ -30,9 +30,10 @@ jobs:
 
       - name: Download Dalamud Latest
         if: steps.cache-dalamud.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          wget ${{ env.DALAMUD_ARCHIVE_URL }} -O ${{ env.DALAMUD_HOME }}.zip
-          unzip ${{ env.DALAMUD_HOME }}.zip -d ${{ env.DALAMUD_HOME }}
+          Invoke-WebRequest -Uri "${{ env.DALAMUD_ARCHIVE_URL }}" -OutFile "${{ env.DALAMUD_HOME }}.zip"
+          Expand-Archive -Path "${{ env.DALAMUD_HOME }}.zip" -DestinationPath "${{ env.DALAMUD_HOME }}"
 
       - name: Build Project
         run: dotnet build --configuration Release FoxyJumpscare/FoxyJumpscare.csproj
