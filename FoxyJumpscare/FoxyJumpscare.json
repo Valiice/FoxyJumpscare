@@ -1,0 +1,16 @@
+{
+  "Author": "Vali",
+  "Name": "Foxy Jumpscare",
+  "InternalName": "FoxyJumpscare",
+  "Description": "Triggers random fullscreen Withered Foxy jumpscares during gameplay, inspired by Five Nights at Freddy's mods.",
+  "Punchline": "Random FNAF-style jumpscares for FFXIV!",
+  "RepoUrl": "https://github.com/Valiice/FoxyJumpscare",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "fun",
+    "horror",
+    "fnaf",
+    "jumpscare",
+    "entertainment"
+  ]
+}
