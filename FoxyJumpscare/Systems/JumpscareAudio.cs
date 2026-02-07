@@ -60,14 +60,16 @@ public class JumpscareAudio(Configuration configuration) : IDisposable
 
     private void PlayAudioStream(WaveStream reader, MemoryStream memoryStream)
     {
-        _waveOut = new WaveOutEvent
-        {
-            Volume = _configuration.Volume
-        };
+        _waveOut = new WaveOutEvent();
         _waveOut.Init(reader);
+
+        var originalVolume = _waveOut.Volume;
+        _waveOut.Volume = _configuration.Volume;
 
         _waveOut.PlaybackStopped += (sender, args) =>
         {
+            if (_waveOut != null)
+                _waveOut.Volume = originalVolume;
             reader.Dispose();
             memoryStream.Dispose();
         };
