@@ -7,41 +7,7 @@ on:
     branches: [ "master", "main" ]
 
 jobs:
-  Build:
-    runs-on: windows-latest
-    env:
-      DALAMUD_HOME: ${{ github.workspace }}\dalamud
-      DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v6
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Cache Dalamud
-        uses: actions/cache@v5
-        id: cache-dalamud
-        with:
-          path: ${{ env.DALAMUD_HOME }}
-          key: dalamud-${{ env.DALAMUD_ARCHIVE_URL }}
-
-      - name: Download Dalamud Latest
-        if: steps.cache-dalamud.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "${{ env.DALAMUD_ARCHIVE_URL }}" -OutFile "${{ env.DALAMUD_HOME }}.zip"
-          Expand-Archive -Path "${{ env.DALAMUD_HOME }}.zip" -DestinationPath "${{ env.DALAMUD_HOME }}"
-
-      - name: Build Project
-        run: dotnet build --configuration Release FoxyJumpscare/FoxyJumpscare.csproj
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: FoxyJumpscare
-          path: |
-             FoxyJumpscare/bin/Release/*
-             !FoxyJumpscare/bin/Release/FoxyJumpscare/*
+  build:
+    uses: ./.github/workflows/setup-and-build.yml
+    with:
+      configuration: Release

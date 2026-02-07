@@ -15,63 +15,74 @@ permissions:
   contents: write
 
 jobs:
-  Build:
-    runs-on: windows-latest
-    env:
-      DALAMUD_HOME: ${{ github.workspace }}\dalamud
-      DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+    steps:
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION="${{ github.ref_name }}"
+            echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: prepare
+    uses: ./.github/workflows/setup-and-build.yml
+    with:
+      configuration: Release
+      version: ${{ needs.prepare.outputs.version }}
+    secrets:
+      token: ${{ secrets.PAT_TOKEN }}
+
+  release:
+    needs: [ prepare, build ]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
+          fetch-depth: 0
 
-      - name: Cache Dalamud
-        uses: actions/cache@v5
-        id: cache-dalamud
+      - name: Download Release Asset
+        uses: actions/download-artifact@v6
         with:
-          path: ${{ env.DALAMUD_HOME }}
-          key: dalamud-${{ env.DALAMUD_ARCHIVE_URL }}
+          name: FoxyJumpscare-release
+          path: release
 
-      - name: Download Dalamud Latest
-        if: steps.cache-dalamud.outputs.cache-hit != 'true'
-        shell: pwsh
+      - name: Generate Changelog
         run: |
-          Invoke-WebRequest -Uri "${{ env.DALAMUD_ARCHIVE_URL }}" -OutFile "${{ env.DALAMUD_HOME }}.zip"
-          Expand-Archive -Path "${{ env.DALAMUD_HOME }}.zip" -DestinationPath "${{ env.DALAMUD_HOME }}"
-
-      - name: Determine Version
-        id: get_version
-        shell: pwsh
-        run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            # Manual run: use the input version
-            "VERSION=${{ github.event.inputs.version }}" >> $env:GITHUB_ENV
-            "TAG_NAME=v${{ github.event.inputs.version }}" >> $env:GITHUB_ENV
-          } else {
-            # Tag push: strip the 'v' prefix
-            $version = "${{ github.ref_name }}" -replace '^v', ''
-            "VERSION=$version" >> $env:GITHUB_ENV
-            "TAG_NAME=${{ github.ref_name }}" >> $env:GITHUB_ENV
-          }
-
-      - name: Build Project
-        run: dotnet build --configuration Release FoxyJumpscare/FoxyJumpscare.csproj -p:AssemblyVersion=${{ env.VERSION }}
-
-      - name: Rename Release Asset
-        shell: pwsh
-        run: Move-Item -Path "FoxyJumpscare\bin\Release\FoxyJumpscare\latest.zip" -Destination "FoxyJumpscare\bin\Release\FoxyJumpscare\FoxyJumpscare.zip"
+          TAG="${{ needs.prepare.outputs.tag_name }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -z "$PREV_TAG" ]; then
+            git log --pretty=format:"- %s" "$TAG" > changelog.txt 2>/dev/null || git log --pretty=format:"- %s" HEAD > changelog.txt
+          else
+            git log --pretty=format:"- %s" "$PREV_TAG..$TAG" > changelog.txt
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ env.TAG_NAME }}
-          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ needs.prepare.outputs.tag_name }}
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
           draft: false
           prerelease: false
-          files: FoxyJumpscare/bin/Release/FoxyJumpscare/FoxyJumpscare.zip
+          body_path: changelog.txt
+          files: release/FoxyJumpscare.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Dispatch Plugin Repo Update
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/Valiice/DalamudPluginRepo/dispatches \
+            -d '{"event_type":"plugin-release","client_payload":{"plugin":"FoxyJumpscare","version":"${{ needs.prepare.outputs.version }}","tag":"${{ needs.prepare.outputs.tag_name }}","repo":"${{ github.repository }}"}}'

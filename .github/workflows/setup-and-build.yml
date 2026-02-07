@@ -1,0 +1,82 @@
+name: Setup and Build
+
+on:
+  workflow_call:
+    inputs:
+      configuration:
+        type: string
+        default: "Release"
+      version:
+        type: string
+        default: ""
+    secrets:
+      token:
+        required: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      DALAMUD_HOME: ${{ github.workspace }}\dalamud
+      DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.token || github.token }}
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Cache Dalamud
+        uses: actions/cache@v5
+        id: cache-dalamud
+        with:
+          path: ${{ env.DALAMUD_HOME }}
+          key: dalamud-${{ env.DALAMUD_ARCHIVE_URL }}
+
+      - name: Download Dalamud Latest
+        if: steps.cache-dalamud.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "${{ env.DALAMUD_ARCHIVE_URL }}" -OutFile "${{ env.DALAMUD_HOME }}.zip"
+          Expand-Archive -Path "${{ env.DALAMUD_HOME }}.zip" -DestinationPath "${{ env.DALAMUD_HOME }}"
+
+      - name: Build Project
+        shell: pwsh
+        run: |
+          $buildArgs = @("build", "--configuration", "${{ inputs.configuration }}", "FoxyJumpscare/FoxyJumpscare.csproj")
+          if ("${{ inputs.version }}" -ne "") {
+            $buildArgs += "-p:AssemblyVersion=${{ inputs.version }}"
+          }
+          dotnet @buildArgs
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: FoxyJumpscare
+          retention-days: 14
+          path: |
+            FoxyJumpscare/bin/${{ inputs.configuration }}/*
+            !FoxyJumpscare/bin/${{ inputs.configuration }}/FoxyJumpscare/
+
+      - name: Rename Release Asset
+        if: inputs.version != ''
+        shell: pwsh
+        run: |
+          $src = "FoxyJumpscare\bin\${{ inputs.configuration }}\FoxyJumpscare\latest.zip"
+          $dst = "FoxyJumpscare\bin\${{ inputs.configuration }}\FoxyJumpscare\FoxyJumpscare.zip"
+          Move-Item -Path $src -Destination $dst
+
+      - name: Upload Release Asset
+        if: inputs.version != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: FoxyJumpscare-release
+          retention-days: 1
+          path: FoxyJumpscare/bin/${{ inputs.configuration }}/FoxyJumpscare/FoxyJumpscare.zip
