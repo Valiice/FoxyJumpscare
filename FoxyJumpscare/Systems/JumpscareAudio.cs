@@ -1,5 +1,6 @@
 using FoxyJumpscare.Core;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using System.Reflection;
 
 namespace FoxyJumpscare.Systems;
@@ -60,21 +61,28 @@ public class JumpscareAudio(Configuration configuration) : IDisposable
 
     private void PlayAudioStream(WaveStream reader, MemoryStream memoryStream)
     {
-        _waveOut = new WaveOutEvent();
-        _waveOut.Init(reader);
+        var waveOut = new WaveOutEvent();
+        _waveOut = waveOut;
 
-        var originalVolume = _waveOut.Volume;
-        _waveOut.Volume = _configuration.Volume;
-
-        _waveOut.PlaybackStopped += (sender, args) =>
+        var volumeProvider = new VolumeSampleProvider(reader.ToSampleProvider())
         {
-            if (_waveOut != null)
-                _waveOut.Volume = originalVolume;
+            Volume = _configuration.Volume
+        };
+        waveOut.Init(volumeProvider);
+
+        // Save the real app volume AFTER Init() so we get the actual mixer value,
+        // then max out the device so sample-level volume isn't capped by a low mixer.
+        var previousVolume = waveOut.Volume;
+        waveOut.Volume = 1.0f;
+
+        waveOut.PlaybackStopped += (sender, args) =>
+        {
+            try { waveOut.Volume = previousVolume; } catch { }
             reader.Dispose();
             memoryStream.Dispose();
         };
 
-        _waveOut.Play();
+        waveOut.Play();
     }
 
     private void StopAudio()
