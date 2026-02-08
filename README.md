@@ -1,46 +1,28 @@
-# Foxy Jumpscare for FFXIV
+# FoxyJumpscare
 
-![Build](https://github.com/Valiice/FoxyJumpscare/actions/workflows/build.yml/badge.svg)
+[![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Valiice/FoxyJumpscare/total?style=flat-square&color=blue)](https://github.com/Valiice/FoxyJumpscare/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/Valiice/FoxyJumpscare?include_prereleases&style=flat-square&color=green)](https://github.com/Valiice/FoxyJumpscare/releases/latest)
+[![GitHub License](https://img.shields.io/github/license/Valiice/FoxyJumpscare?style=flat-square&color=orange)](LICENSE)
+[![GitHub Issues](https://img.shields.io/github/issues/Valiice/FoxyJumpscare?style=flat-square)](https://github.com/Valiice/FoxyJumpscare/issues)
+[![Download Latest Zip](https://img.shields.io/badge/Download-Latest%20Zip-blue?style=flat-square)](https://github.com/Valiice/FoxyJumpscare/releases/latest/download/FoxyJumpscare.zip)
 
-Random FNAF Withered Foxy jumpscares while you play FFXIV. Because why not?
-
-## What it does
-
-- Randomly triggers a fullscreen Foxy jumpscare with sound
-- Default: 1 in 10,000 chance every second (adjust in settings)
-- Type `/foxy` in-game to configure
+**FoxyJumpscare** is a Dalamud plugin for Final Fantasy XIV that triggers random FNAF-style Withered Foxy jumpscares during gameplay.
 
 ## Installation
 
-1. Install [XIVLauncher](https://goatcorp.github.io/)
-2. Copy `FoxyJumpscare.dll` to `%APPDATA%\XIVLauncher\devPlugins\FoxyJumpscare\`
-3. Type `/xlplugins` in-game to reload
-4. Type `/foxy` to open settings
-
-## Building
-
-```bash
-cd FoxyJumpscare
-dotnet build FoxyJumpscare.csproj
-```
-
-Output: `FoxyJumpscare/bin/Debug/FoxyJumpscare.dll`
+1. Add my custom plugin repository: [https://github.com/Valiice/DalamudPluginRepo](https://github.com/Valiice/DalamudPluginRepo)
+2. Search for **FoxyJumpscare** in the Plugin Installer.
+3. Install and Enable.
 
 ## Settings
 
-- **Enable/Disable** - Toggle it on/off
+Type `/foxy` in-game to open the configuration window.
+
+- **Enable/Disable** - Toggle jumpscares on/off
 - **Odds** - 1/1000 to 1/50000 (lower = more scary)
 - **Volume** - 0-100%
 - **Test Button** - Preview before you regret it
 
-## For Developers
+## License
 
-Stack: Dalamud.NET.Sdk 14.0.1, .NET 10, NAudio, ImageSharp
-
-To make a release:
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-CI/CD handles the rest (builds, releases, dependency updates).
+This project is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE) for details.
