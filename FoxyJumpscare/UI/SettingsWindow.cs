@@ -1,6 +1,9 @@
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
+using Dalamud.Utility;
 using FoxyJumpscare.Core;
 using System.Numerics;
 
@@ -11,6 +14,7 @@ public class SettingsWindow : Window, IDisposable
     private readonly Configuration _configuration;
     private readonly IDalamudPluginInterface _pluginInterface;
     private readonly Action _onTestJumpscare;
+    private float _kofiButtonWidth;
 
     public SettingsWindow(Configuration configuration, IDalamudPluginInterface pluginInterface, Action onTestJumpscare)
         : base("Foxy Jumpscare Settings###FoxySettings")
@@ -25,6 +29,7 @@ public class SettingsWindow : Window, IDisposable
 
     public override void Draw()
     {
+        DrawKofiButton();
         DrawEnableCheckbox();
         DrawSeparator();
         DrawJumpscareOddsSlider();
@@ -33,6 +38,24 @@ public class SettingsWindow : Window, IDisposable
         DrawSeparator();
         DrawTestButton();
         DrawWarningText();
+    }
+
+    private void DrawKofiButton()
+    {
+        var startPos = ImGui.GetCursorPos();
+        if (_kofiButtonWidth > 0)
+        {
+            ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X - _kofiButtonWidth);
+        }
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Coffee, "Support",
+            new Vector4(1.0f, 0.35f, 0.35f, 0.9f),
+            new Vector4(1.0f, 0.25f, 0.25f, 1.0f),
+            new Vector4(1.0f, 0.35f, 0.35f, 0.75f)))
+        {
+            Util.OpenLink("https://ko-fi.com/valiice");
+        }
+        _kofiButtonWidth = ImGui.GetItemRectSize().X;
+        ImGui.SetCursorPos(startPos);
     }
 
     private void DrawEnableCheckbox()
