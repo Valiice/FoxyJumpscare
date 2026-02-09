@@ -74,7 +74,21 @@ public class SettingsWindow : Window, IDisposable
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), $"Current: 1 in {_configuration.JumpscareOdds} chance per second");
 
         var odds = _configuration.JumpscareOdds;
-        if (ImGui.SliderInt("##JumpscareOdds", ref odds, 1000, 50000, $"1 in {odds}"))
+        var changed = ImGui.SliderInt("##JumpscareOdds", ref odds, 1000, 50000, $"1 in {odds}");
+
+        // Right-click to reset to default
+        if (ImGui.IsItemHovered())
+        {
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+            {
+                odds = 10000; // Default value
+                changed = true;
+            }
+
+            ImGui.SetTooltip("Drag to adjust odds\nRight-click to reset to default (1 in 10000)");
+        }
+
+        if (changed)
         {
             _configuration.JumpscareOdds = odds;
             SaveConfiguration();
@@ -85,7 +99,21 @@ public class SettingsWindow : Window, IDisposable
     {
         ImGui.Text("Scream Volume");
         var volumePercent = (int)(_configuration.Volume * 100f);
-        if (ImGui.SliderInt("##Volume", ref volumePercent, 0, 100, $"{volumePercent}%%"))
+        var changed = ImGui.SliderInt("##Volume", ref volumePercent, 0, 100, $"{volumePercent}%%");
+
+        // Right-click to reset to default
+        if (ImGui.IsItemHovered())
+        {
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+            {
+                volumePercent = 80; // Default: 80% (0.8f * 100)
+                changed = true;
+            }
+
+            ImGui.SetTooltip("Drag to adjust volume\nRight-click to reset to default (80%)");
+        }
+
+        if (changed)
         {
             _configuration.Volume = volumePercent / 100f;
             SaveConfiguration();
