@@ -13,22 +13,16 @@ public class JumpscareAudio(Configuration configuration) : IDisposable
 
     public void PlayScream()
     {
-        try
-        {
-            StopAudio();
+        StopAudio();
 
-            using var resourceStream = GetEmbeddedAudioResource();
-            if (resourceStream == null)
-                return;
+        using var resourceStream = GetEmbeddedAudioResource();
+        if (resourceStream == null)
+            return;
 
-            var memoryStream = CopyToMemoryStream(resourceStream);
-            var reader = CreateAudioReader(memoryStream);
+        var memoryStream = CopyToMemoryStream(resourceStream);
+        var reader = CreateAudioReader(memoryStream);
 
-            PlayAudioStream(reader, memoryStream);
-        }
-        catch (Exception)
-        {
-        }
+        PlayAudioStream(reader, memoryStream);
     }
 
     private static Stream? GetEmbeddedAudioResource()
@@ -73,16 +67,38 @@ public class JumpscareAudio(Configuration configuration) : IDisposable
         // Save the real app volume AFTER Init() so we get the actual mixer value,
         // then max out the device so sample-level volume isn't capped by a low mixer.
         var previousVolume = waveOut.Volume;
-        waveOut.Volume = 1.0f;
+        var volumeChanged = false;
 
-        waveOut.PlaybackStopped += (sender, args) =>
+        try
         {
-            try { waveOut.Volume = previousVolume; } catch { }
+            waveOut.Volume = 1.0f;
+            volumeChanged = true;
+
+            waveOut.PlaybackStopped += (sender, args) =>
+            {
+                waveOut.Volume = previousVolume;
+                reader.Dispose();
+                memoryStream.Dispose();
+                waveOut.Dispose();
+
+                // Clear reference if still pointing to this instance
+                if (_waveOut == waveOut)
+                    _waveOut = null;
+            };
+
+            waveOut.Play();
+        }
+        catch
+        {
+            // If Play() fails, immediately restore volume before re-throwing
+            if (volumeChanged)
+            {
+                try { waveOut.Volume = previousVolume; } catch { }
+            }
             reader.Dispose();
             memoryStream.Dispose();
-        };
-
-        waveOut.Play();
+            throw;
+        }
     }
 
     private void StopAudio()
