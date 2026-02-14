@@ -57,6 +57,7 @@ jobs:
           dotnet @buildArgs
 
       - name: Upload Build Artifact
+        if: inputs.version == ''
         uses: actions/upload-artifact@v6
         with:
           name: FoxyJumpscare
