@@ -5,62 +5,72 @@ using System.Reflection;
 
 namespace FoxyJumpscare.Systems;
 
-public class JumpscareAudio(Configuration configuration) : IDisposable
+public class JumpscareAudio : IDisposable
 {
-    private readonly Configuration _configuration = configuration;
+    private readonly Configuration _configuration;
+    private readonly byte[] _cachedMp3Bytes;
+    private readonly object _lock = new();
     private WaveOutEvent? _waveOut;
     private bool _disposed;
 
-    public void PlayScream()
+    public JumpscareAudio(Configuration configuration)
     {
-        StopAudio();
-
-        using var resourceStream = GetEmbeddedAudioResource();
-        if (resourceStream == null)
-            return;
-
-        var memoryStream = CopyToMemoryStream(resourceStream);
-        var reader = CreateAudioReader(memoryStream);
-
-        PlayAudioStream(reader, memoryStream);
+        _configuration = configuration;
+        _cachedMp3Bytes = LoadMp3Bytes();
     }
 
-    private static Stream? GetEmbeddedAudioResource()
+    private static byte[] LoadMp3Bytes()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        var resourceName = "FoxyJumpscare.Resources.scream.mp3";
-        return assembly.GetManifestResourceStream(resourceName);
+        using var stream = assembly.GetManifestResourceStream("FoxyJumpscare.Resources.scream.mp3")
+            ?? throw new InvalidOperationException("Embedded scream.mp3 resource not found.");
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
     }
 
-    private static MemoryStream CopyToMemoryStream(Stream source)
+    public void PlayScream()
     {
-        var memoryStream = new MemoryStream();
-        source.CopyTo(memoryStream);
-        memoryStream.Position = 0;
-        return memoryStream;
-    }
-
-    private static WaveStream CreateAudioReader(MemoryStream memoryStream)
-    {
-        try
+        // Stop any previous playback (quick — just signals the device)
+        WaveOutEvent? previous;
+        lock (_lock)
         {
-            return new WaveFileReader(memoryStream);
+            previous = _waveOut;
+            _waveOut = null;
         }
-        catch
+        if (previous != null)
         {
-            memoryStream.Position = 0;
-            return new Mp3FileReader(memoryStream);
+            previous.Stop();
+            previous.Dispose();
         }
+
+        // Capture volume on the game thread so we don't read config off-thread
+        var volume = _configuration.Volume;
+
+        Task.Run(() => PlayScreamAsync(volume));
     }
 
-    private void PlayAudioStream(WaveStream reader, MemoryStream memoryStream)
+    private void PlayScreamAsync(float volume)
     {
+        var memoryStream = new MemoryStream(_cachedMp3Bytes);
+        var reader = new Mp3FileReader(memoryStream);
         var waveOut = new WaveOutEvent();
-        _waveOut = waveOut;
+
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                reader.Dispose();
+                memoryStream.Dispose();
+                waveOut.Dispose();
+                return;
+            }
+            _waveOut = waveOut;
+        }
 
         var volumeProvider = new VolumeSampleProvider(reader.ToSampleProvider())
         {
-            Volume = _configuration.Volume
+            Volume = volume
         };
         waveOut.Init(volumeProvider);
 
@@ -81,43 +91,51 @@ public class JumpscareAudio(Configuration configuration) : IDisposable
                 memoryStream.Dispose();
                 waveOut.Dispose();
 
-                // Clear reference if still pointing to this instance
-                if (_waveOut == waveOut)
-                    _waveOut = null;
+                lock (_lock)
+                {
+                    if (_waveOut == waveOut)
+                        _waveOut = null;
+                }
             };
 
             waveOut.Play();
         }
         catch
         {
-            // If Play() fails, immediately restore volume before re-throwing
             if (volumeChanged)
             {
                 try { waveOut.Volume = previousVolume; } catch { }
             }
             reader.Dispose();
             memoryStream.Dispose();
-            throw;
-        }
-    }
+            waveOut.Dispose();
 
-    private void StopAudio()
-    {
-        if (_waveOut != null)
-        {
-            _waveOut.Stop();
-            _waveOut.Dispose();
-            _waveOut = null;
+            lock (_lock)
+            {
+                if (_waveOut == waveOut)
+                    _waveOut = null;
+            }
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        WaveOutEvent? current;
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            current = _waveOut;
+            _waveOut = null;
+        }
 
-        StopAudio();
-        _disposed = true;
+        if (current != null)
+        {
+            current.Stop();
+            current.Dispose();
+        }
+
         GC.SuppressFinalize(this);
     }
 }
