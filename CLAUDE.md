@@ -33,7 +33,7 @@ dotnet clean FoxyJumpscare/FoxyJumpscare.csproj
 - **Dalamud.NET.Sdk 14.0.1**: Plugin framework and build tooling
 - **Target Framework**: .NET 10.0-windows (x64)
 - **NAudio 2.2.1**: Audio playback for scream sound effect
-- **SixLabors.ImageSharp 3.1.6**: GIF decoding and frame extraction
+- **SixLabors.ImageSharp 3.1.12**: GIF decoding and frame extraction
 
 ### Project Structure (Separation of Concerns)
 
@@ -55,7 +55,7 @@ FoxyJumpscare/
 │   └── SettingsWindow.cs         # Configuration window
 │
 └── Resources/                    # Embedded assets
-    ├── FNAF2OldFoxyJumpscare.gif # Animated jumpscare (decoded at runtime)
+    ├── FNAF2FoxyJumpscare.gif # Animated jumpscare (decoded at runtime)
     └── scream.mp3                # Scream sound effect
 ```
 
@@ -81,7 +81,8 @@ FoxyJumpscare/
 
 **JumpscareAudio.cs**
 - Uses NAudio (WaveOutEvent) for audio playback
-- Loads embedded MP3/WAV from manifest resources
+- Pre-caches embedded MP3 bytes at construction; plays audio off-thread via `Task.Run()`
+- Thread-safe `_waveOut` access with lock for concurrent play/dispose
 - Configurable volume (0.0 - 1.0)
 
 **Configuration.cs**
@@ -133,13 +134,13 @@ Two manifest sources (both required):
 - **Build preference**: Debug builds only (unless user requests Release)
 - **ImGui namespace**: Use `Dalamud.Bindings.ImGui` with global using alias
 - **Texture API**: `ITextureProvider.CreateFromRaw()` with `RawImageSpecification.Rgba32()`
-- **Thread safety**: All Dalamud callbacks run on game thread
+- **Thread safety**: All Dalamud callbacks run on game thread; audio playback runs off-thread
 - **Validation warnings fixed**: OpenMainUi registered, Tags added to manifest
 - **No Release builds**: User prefers Debug for testing
 
 ## Asset Sources
 
-- **Foxy GIF**: `FNAF2OldFoxyJumpscare.gif` (1.3MB, 14 frames)
+- **Foxy GIF**: `FNAF2FoxyJumpscare.gif` (1.3MB, 14 frames)
 - **Scream Sound**: `scream.mp3` (27KB, actual FNAF sound)
 - Both embedded as resources in the DLL
 
@@ -149,6 +150,7 @@ Two manifest sources (both required):
 - All frames pre-loaded as textures
 - 30 FPS animation (0.033s frame duration)
 - No pixel manipulation (removed grey background code that broke image)
+- Audio setup runs off game thread (`Task.Run`) to avoid frame hitches
 - Minimal overhead when jumpscare inactive
 
 ## CI/CD & GitHub Actions
@@ -157,7 +159,7 @@ Two manifest sources (both required):
 
 **.github/workflows/build.yml**
 - Triggers: Push/PR to master or main branches
-- Builds project in Release mode on Ubuntu
+- Builds project in Release mode on Windows
 - Caches Dalamud SDK for faster builds
 - Uploads build artifacts
 
